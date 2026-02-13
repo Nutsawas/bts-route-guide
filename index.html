@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <title>แนะนำสายรถไฟฟ้า BTS / MRT / Airport Rail Link</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+:root{--bg:#0f1419;--surface:#1a2332;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--accent-hover:#79b8ff;--border:#30363d;--green:#3fb950;--gold:#d4a72c;--blue:#58a6ff;--red:#f85149}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Sarabun","Segoe UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+.container{max-width:520px;margin:0 auto;padding:1.5rem}
+header{text-align:center;margin-bottom:2rem}
+header h1{font-size:1.5rem;font-weight:700;margin:0 0 0.25rem 0}
+.subtitle{color:var(--muted);font-size:0.95rem;margin:0}
+.form-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1.5rem}
+.form-section h2{font-size:0.9rem;font-weight:600;color:var(--muted);margin:0 0 0.75rem 0}
+.form-section .row{margin-bottom:1rem}
+.form-section .row:last-of-type{margin-bottom:0}
+.field{margin-bottom:0.75rem}
+.field label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.35rem}
+.field select{width:100%;padding:0.6rem 0.75rem;font-size:1rem;font-family:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:8px;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 0.75rem center;padding-right:2rem}
+.field select:focus{outline:none;border-color:var(--accent)}
+.actions{margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)}
+#btn-search{width:100%;padding:0.75rem 1rem;font-size:1rem;font-weight:600;font-family:inherit;color:var(--bg);background:var(--accent);border:none;border-radius:8px;cursor:pointer}
+#btn-search:hover{background:var(--accent-hover)}
+#btn-search:focus{outline:none;box-shadow:0 0 0 2px var(--accent)}
+.result-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem}
+.result-section h2{font-size:0.9rem;font-weight:600;color:var(--muted);margin:0 0 0.75rem 0}
+#result-content{min-height:2rem}
+#result-content.empty{color:var(--muted);font-size:0.9rem}
+.result-section .error{color:var(--red)}
+.result-section .legs{list-style:none;padding:0;margin:0}
+.result-section .leg{padding:0.6rem 0;border-bottom:1px solid var(--border);font-size:0.95rem}
+.result-section .leg:last-child{border-bottom:none}
+.result-section .leg .line-name{font-weight:600;color:var(--accent)}
+.result-section .leg .transfer-note{margin-top:0.35rem;font-size:0.85rem;color:var(--muted)}
+.result-section .summary{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);font-size:0.9rem;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>แนะนำสายรถไฟฟ้า</h1>
+      <p class="subtitle">BTS · MRT · Airport Rail Link</p>
+    </header>
+
+    <main>
+      <section class="form-section">
+        <div class="row origin">
+          <h2>ต้นทาง</h2>
+          <div class="field">
+            <label for="origin-line">สาย</label>
+            <select id="origin-line" aria-label="สายต้นทาง"></select>
+          </div>
+          <div class="field">
+            <label for="origin-station">สถานี</label>
+            <select id="origin-station" aria-label="สถานีต้นทาง"></select>
+          </div>
+        </div>
+
+        <div class="row destination">
+          <h2>ปลายทาง</h2>
+          <div class="field">
+            <label for="dest-line">สาย</label>
+            <select id="dest-line" aria-label="สายปลายทาง"></select>
+          </div>
+          <div class="field">
+            <label for="dest-station">สถานี</label>
+            <select id="dest-station" aria-label="สถานีปลายทาง"></select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="btn-search">ค้นหาเส้นทาง</button>
+        </div>
+      </section>
+
+      <section class="result-section" id="result-section" aria-live="polite">
+        <h2>เส้นทาง</h2>
+        <div id="result-content"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+/**
+ * BTS, MRT, ARL lines and stations.
+ * Station id is canonical: same id on multiple lines = interchange.
+ * Use var so window.LINES is set in browser (const does not assign to window in some environments).
+ */
+var LINES = [
+  {
+    id: "bts_sukhumvit",
+    name: "BTS สายสุขุมวิท",
+    nameEn: "BTS Sukhumvit Line",
+    stations: [
+      { id: "khu_khot", nameEn: "Khu Khot", nameTh: "คูคต" },
+      { id: "yaek_kor_por_aor", nameEn: "Yaek Kor Por Aor", nameTh: "แยก ค.ป.อ." },
+      { id: "phahonyothin_59", nameEn: "Phahon Yothin 59", nameTh: "พหลโยธิน 59" },
+      { id: "sai_yud", nameEn: "Sai Yud", nameTh: "สายหยุด" },
+      { id: "saphan_mai", nameEn: "Saphan Mai", nameTh: "สะพานใหม่" },
+      { id: "bhumibol_hospital", nameEn: "Bhumibol Adulyadej Hospital", nameTh: "โรงพยาบาลภูมิพลอดุลยเดช" },
+      { id: "air_force_museum", nameEn: "Royal Thai Air Force Museum", nameTh: "พิพิธภัณฑ์กองทัพอากาศ" },
+      { id: "krung_si", nameEn: "11th Infantry Regiment", nameTh: "กรมทหารราบที่ 11" },
+      { id: "wongsawang", nameEn: "Wongsawang", nameTh: "วงศ์สว่าง" },
+      { id: "bang_khen", nameEn: "Bang Khen", nameTh: "บางเขน" },
+      { id: "wat_phra_sri_mahathat", nameEn: "Wat Phra Sri Mahathat", nameTh: "วัดพระศรีมหาธาตุ" },
+      { id: "kasetsart_university", nameEn: "Kasetsart University", nameTh: "มหาวิทยาลัยเกษตรศาสตร์" },
+      { id: "sena_nikhom", nameEn: "Sena Nikhom", nameTh: "เสนานิคม" },
+      { id: "ratchayothin", nameEn: "Ratchayothin", nameTh: "รัชโยธิน" },
+      { id: "phahonyothin_24", nameEn: "Phahon Yothin 24", nameTh: "พหลโยธิน 24" },
+      { id: "mo_chit", nameEn: "Mo Chit", nameTh: "หมอชิต" },
+      { id: "saphan_khwai", nameEn: "Saphan Khwai", nameTh: "สะพานควาย" },
+      { id: "ari", nameEn: "Ari", nameTh: "อารีย์" },
+      { id: "sanam_pao", nameEn: "Sanam Pao", nameTh: "สนามเป้า" },
+      { id: "victory_monument", nameEn: "Victory Monument", nameTh: "อนุสาวรีย์ชัยสมรภูมิ" },
+      { id: "phaya_thai", nameEn: "Phaya Thai", nameTh: "พญาไท" },
+      { id: "ratchathewi", nameEn: "Ratchathewi", nameTh: "ราชเทวี" },
+      { id: "siam", nameEn: "Siam", nameTh: "สยาม" },
+      { id: "chit_lom", nameEn: "Chit Lom", nameTh: "ชิดลม" },
+      { id: "phloen_chit", nameEn: "Phloen Chit", nameTh: "เพลินจิต" },
+      { id: "nana", nameEn: "Nana", nameTh: "นานา" },
+      { id: "asok", nameEn: "Asok", nameTh: "อโศก" },
+      { id: "phrom_phong", nameEn: "Phrom Phong", nameTh: "พร้อมพงษ์" },
+      { id: "thong_lo", nameEn: "Thong Lo", nameTh: "ทองหล่อ" },
+      { id: "ekkamai", nameEn: "Ekkamai", nameTh: "เอกมัย" },
+      { id: "phra_khanong", nameEn: "Phra Khanong", nameTh: "พระโขนง" },
+      { id: "on_nut", nameEn: "On Nut", nameTh: "อ่อนนุช" },
+      { id: "bang_chak", nameEn: "Bang Chak", nameTh: "บางจาก" },
+      { id: "punnawithi", nameEn: "Punnawithi", nameTh: "ปุณณวิถี" },
+      { id: "udom_suk", nameEn: "Udom Suk", nameTh: "อุดมสุข" },
+      { id: "bang_na", nameEn: "Bang Na", nameTh: "บางนา" },
+      { id: "bearing", nameEn: "Bearing", nameTh: "แบริ่ง" },
+      { id: "samrong", nameEn: "Samrong", nameTh: "สำโรง" },
+      { id: "pu_chao", nameEn: "Pu Chao", nameTh: "ปู่เจ้า" },
+      { id: "chang_erawan", nameEn: "Chang Erawan", nameTh: "ช้างเอราวัณ" },
+      { id: "royal_naval_academy", nameEn: "Royal Thai Naval Academy", nameTh: "โรงเรียนนายเรือ" },
+      { id: "pak_nam", nameEn: "Pak Nam", nameTh: "ปากน้ำ" },
+      { id: "srinakarin", nameEn: "Srinagarindra", nameTh: "ศรีนครินทร์" },
+      { id: "phraek_sa", nameEn: "Phraek Sa", nameTh: "แพรกษา" },
+      { id: "sai_luat", nameEn: "Sai Luat", nameTh: "สายลวด" },
+      { id: "kheha", nameEn: "Kheha", nameTh: "เคหะฯ" },
+    ],
+  },
+  {
+    id: "bts_silom",
+    name: "BTS สายสีลม",
+    nameEn: "BTS Silom Line",
+    stations: [
+      { id: "national_stadium", nameEn: "National Stadium", nameTh: "สนามกีฬาแห่งชาติ" },
+      { id: "siam", nameEn: "Siam", nameTh: "สยาม" },
+      { id: "ratchadamri", nameEn: "Ratchadamri", nameTh: "ราชดำริ" },
+      { id: "sala_daeng", nameEn: "Sala Daeng", nameTh: "ศาลาแดง" },
+      { id: "chong_nonsi", nameEn: "Chong Nonsi", nameTh: "ช่องนนทรี" },
+      { id: "saint_louis", nameEn: "Saint Louis", nameTh: "เซนต์หลุยส์" },
+      { id: "surasak", nameEn: "Surasak", nameTh: "สุรศักดิ์" },
+      { id: "saphan_taksin", nameEn: "Saphan Taksin", nameTh: "สะพานตากสิน" },
+      { id: "krung_thon_buri", nameEn: "Krung Thon Buri", nameTh: "กรุงธนบุรี" },
+      { id: "wongwian_yai", nameEn: "Wongwian Yai", nameTh: "วงเวียนใหญ่" },
+      { id: "pho_nimit", nameEn: "Pho Nimit", nameTh: "โพธิ์นิมิตร" },
+      { id: "talat_phlu", nameEn: "Talat Phlu", nameTh: "ตลาดพลู" },
+      { id: "wutthakat", nameEn: "Wutthakat", nameTh: "วุฒากาศ" },
+      { id: "bang_wa", nameEn: "Bang Wa", nameTh: "บางหว้า" },
+    ],
+  },
+  {
+    id: "bts_gold",
+    name: "BTS สายทอง",
+    nameEn: "BTS Gold Line",
+    stations: [
+      { id: "krung_thon_buri", nameEn: "Krung Thon Buri", nameTh: "กรุงธนบุรี" },
+      { id: "charoen_nakhon", nameEn: "Charoen Nakhon (ICONSIAM)", nameTh: "เจริญนคร" },
+      { id: "khlong_san", nameEn: "Khlong San", nameTh: "คลองสาน" },
+      { id: "prajadhipok", nameEn: "Prajadhipok", nameTh: "ประชาธิปัตย์" },
+    ],
+  },
+  {
+    id: "mrt_blue",
+    name: "MRT สายสีน้ำเงิน",
+    nameEn: "MRT Blue Line",
+    stations: [
+      { id: "tha_phra", nameEn: "Tha Phra", nameTh: "ท่าพระ" },
+      { id: "charan_13", nameEn: "Charan 13", nameTh: "จรัญฯ 13" },
+      { id: "fai_chai", nameEn: "Fai Chai", nameTh: "ไฟฉาย" },
+      { id: "bang_khun_non", nameEn: "Bang Khun Non", nameTh: "บางขุนนนท์" },
+      { id: "bang_yi_khan", nameEn: "Bang Yi Khan", nameTh: "บางยี่ขัน" },
+      { id: "sirindhorn", nameEn: "Sirindhorn", nameTh: "สิรินธร" },
+      { id: "bang_phlat", nameEn: "Bang Phlat", nameTh: "บางพลัด" },
+      { id: "bang_o", nameEn: "Bang O", nameTh: "บางอ้อ" },
+      { id: "bang_pho", nameEn: "Bang Pho", nameTh: "บางโพ" },
+      { id: "tao_poon", nameEn: "Tao Poon", nameTh: "เตาปูน" },
+      { id: "bang_sue", nameEn: "Bang Sue", nameTh: "บางซื่อ" },
+      { id: "kamphaeng_phet", nameEn: "Kamphaeng Phet", nameTh: "กำแพงเพชร" },
+      { id: "mo_chit", nameEn: "Chatuchak Park", nameTh: "สวนจตุจักร" },
+      { id: "phahon_yothin", nameEn: "Phahon Yothin", nameTh: "พหลโยธิน" },
+      { id: "lat_phrao", nameEn: "Lat Phrao", nameTh: "ห้าแยกลาดพร้าว" },
+      { id: "ratchadaphisek", nameEn: "Ratchadaphisek", nameTh: "รัชดาภิเษก" },
+      { id: "sutthisan", nameEn: "Sutthisan", nameTh: "สุทธิสาร" },
+      { id: "huai_khwang", nameEn: "Huai Khwang", nameTh: "ห้วยขวาง" },
+      { id: "thailand_cultural_centre", nameEn: "Thailand Cultural Centre", nameTh: "ศูนย์วัฒนธรรมแห่งประเทศไทย" },
+      { id: "phra_ram_9", nameEn: "Phra Ram 9", nameTh: "พระราม 9" },
+      { id: "phetchaburi", nameEn: "Phetchaburi", nameTh: "เพชรบุรี" },
+      { id: "asok", nameEn: "Sukhumvit", nameTh: "สุขุมวิท" },
+      { id: "queen_sirikit_ncc", nameEn: "Queen Sirikit National Convention Centre", nameTh: "ศูนย์การประชุมแห่งชาติสิริกิติ์" },
+      { id: "khlong_toei", nameEn: "Khlong Toei", nameTh: "คลองเตย" },
+      { id: "lumphini", nameEn: "Lumphini", nameTh: "ลุมพินี" },
+      { id: "sala_daeng", nameEn: "Si Lom", nameTh: "สีลม" },
+      { id: "sam_yan", nameEn: "Sam Yan", nameTh: "สามย่าน" },
+      { id: "hua_lamphong", nameEn: "Hua Lamphong", nameTh: "หัวลำโพง" },
+      { id: "wat_mangkon", nameEn: "Wat Mangkon", nameTh: "วัดมังกร" },
+      { id: "sam_yot", nameEn: "Sam Yot", nameTh: "สามยอด" },
+      { id: "sanam_chai", nameEn: "Sanam Chai", nameTh: "สนามไชย" },
+      { id: "itsaraphap", nameEn: "Itsaraphap", nameTh: "อิสรภาพ" },
+      { id: "tha_phra", nameEn: "Tha Phra", nameTh: "ท่าพระ" },
+      { id: "bang_phai", nameEn: "Bang Phai", nameTh: "บางไผ่" },
+      { id: "bang_wa", nameEn: "Bang Wa", nameTh: "บางหว้า" },
+      { id: "phetkasem_48", nameEn: "Phetkasem 48", nameTh: "เพชรเกษม 48" },
+      { id: "phasi_charoen", nameEn: "Phasi Charoen", nameTh: "ภาษีเจริญ" },
+      { id: "bang_khae", nameEn: "Bang Khae", nameTh: "บางแค" },
+      { id: "lak_song", nameEn: "Lak Song", nameTh: "หลักสอง" },
+    ],
+  },
+  {
+    id: "mrt_purple",
+    name: "MRT สายสีม่วง",
+    nameEn: "MRT Purple Line",
+    stations: [
+      { id: "khlong_bang_phai", nameEn: "Khlong Bang Phai", nameTh: "คลองบางไผ่" },
+      { id: "talad_bang_yai", nameEn: "Talad Bang Yai", nameTh: "ตลาดบางใหญ่" },
+      { id: "sam_yaek_bang_yai", nameEn: "Sam Yaek Bang Yai", nameTh: "สามแยกบางใหญ่" },
+      { id: "bang_phlu", nameEn: "Bang Phlu", nameTh: "บางพลู" },
+      { id: "bang_rak_yai", nameEn: "Bang Rak Yai", nameTh: "บางรักใหญ่" },
+      { id: "bang_rak_noi", nameEn: "Bang Rak Noi Tha It", nameTh: "บางรักน้อย ท่าอิฐ" },
+      { id: "sai_ma", nameEn: "Sai Ma", nameTh: "ไทรม้า" },
+      { id: "phra_nang_klao_bridge", nameEn: "Phra Nang Klao Bridge", nameTh: "สะพานพระนั่งเกล้า" },
+      { id: "yaek_nonthaburi_1", nameEn: "Yaek Nonthaburi 1", nameTh: "แยกนนทบุรี 1" },
+      { id: "bang_krasor", nameEn: "Bang Krasor", nameTh: "บางกระสอ" },
+      { id: "nonthaburi_civic_center", nameEn: "Nonthaburi Civic Centre", nameTh: "ศูนย์ราชการนนทบุรี" },
+      { id: "ministry_public_health", nameEn: "Ministry of Public Health", nameTh: "กระทรวงสาธารณสุข" },
+      { id: "yaek_tiwanon", nameEn: "Yaek Tiwanon", nameTh: "แยกติวานนท์" },
+      { id: "wong_sawang", nameEn: "Wong Sawang", nameTh: "วงศ์สว่าง" },
+      { id: "bang_son", nameEn: "Bang Son", nameTh: "บางซ่อน" },
+      { id: "tao_poon", nameEn: "Tao Poon", nameTh: "เตาปูน" },
+    ],
+  },
+  {
+    id: "mrt_yellow",
+    name: "MRT สายสีเหลือง",
+    nameEn: "MRT Yellow Line",
+    stations: [
+      { id: "lat_phrao", nameEn: "Lat Phrao", nameTh: "ลาดพร้าว" },
+      { id: "phawana", nameEn: "Phawana", nameTh: "ภาวนา" },
+      { id: "chokchai_4", nameEn: "Chok Chai 4", nameTh: "โชคชัย 4" },
+      { id: "lat_phrao_71", nameEn: "Lat Phrao 71", nameTh: "ลาดพร้าว 71" },
+      { id: "lat_phrao_83", nameEn: "Lat Phrao 83", nameTh: "ลาดพร้าว 83" },
+      { id: "mahatthai", nameEn: "Ministry of Interior", nameTh: "มหาดไทย" },
+      { id: "lat_phrao_101", nameEn: "Lat Phrao 101", nameTh: "ลาดพร้าว 101" },
+      { id: "bang_kapi", nameEn: "Bang Kapi", nameTh: "บางกะปิ" },
+      { id: "yaek_lam_sali", nameEn: "Yaek Lam Sali", nameTh: "แยกลำสาลี" },
+      { id: "si_krida", nameEn: "Si Krida", nameTh: "ศรีกรีฑา" },
+      { id: "hua_mak", nameEn: "Hua Mak", nameTh: "หัวหมาก" },
+      { id: "kalantan", nameEn: "Kalantan", nameTh: "กลันตัน" },
+      { id: "si_nuch", nameEn: "Si Nuch", nameTh: "ศรีนุช" },
+      { id: "srinakarin_38", nameEn: "Srinakarin 38", nameTh: "ศรีนครินทร์ 38" },
+      { id: "suan_luang_r9", nameEn: "Suan Luang Ratchakan", nameTh: "สวนหลวง ร.9" },
+      { id: "si_udom", nameEn: "Si Udom", nameTh: "ศรีอุดม" },
+      { id: "si_iam", nameEn: "Si Iam", nameTh: "ศรีเอี่ยม" },
+      { id: "si_la_salle", nameEn: "La Salle", nameTh: "ศรีลาซาล" },
+      { id: "si_bearing", nameEn: "Si Bearing", nameTh: "ศรีแบริ่ง" },
+      { id: "si_dan", nameEn: "Si Dan", nameTh: "ศรีด่าน" },
+      { id: "si_thepha", nameEn: "Si Thepha", nameTh: "ศรีเทพา" },
+      { id: "thiphavan", nameEn: "Thiphavan", nameTh: "ทิพวัล" },
+      { id: "samrong", nameEn: "Samrong", nameTh: "สำโรง" },
+    ],
+  },
+  {
+    id: "mrt_pink",
+    name: "MRT สายสีชมพู",
+    nameEn: "MRT Pink Line",
+    stations: [
+      { id: "nonthaburi_civic_center", nameEn: "Nonthaburi Civic Centre", nameTh: "ศูนย์ราชการนนทบุรี" },
+      { id: "khae_rai", nameEn: "Khae Rai", nameTh: "แคราย" },
+      { id: "sanam_bin_nam", nameEn: "Sanam Bin Nam", nameTh: "สนามบินน้ำ" },
+      { id: "samakkhi", nameEn: "Samakkhi", nameTh: "สามัคคี" },
+      { id: "krom_chonlaprathan", nameEn: "Royal Irrigation Department", nameTh: "กรมชลประทาน" },
+      { id: "yaek_pak_kret", nameEn: "Yaek Pak Kret", nameTh: "แยกปากเกร็ด" },
+      { id: "liang_mueang_pak_kret", nameEn: "Liang Mueang Pak Kret", nameTh: "เลี่ยงเมืองปากเกร็ด" },
+      { id: "chaengwattana_pak_kret_28", nameEn: "Chaeng Watthana - Pak Kret 28", nameTh: "แจ้งวัฒนะ-ปากเกร็ด 28" },
+      { id: "si_rach", nameEn: "Si Rach", nameTh: "ศรีรัช" },
+      { id: "muang_thong_thani", nameEn: "Muang Thong Thani", nameTh: "เมืองทองธานี" },
+      { id: "chaengwattana_14", nameEn: "Chaeng Watthana 14", nameTh: "แจ้งวัฒนะ 14" },
+      { id: "government_complex_chaengwattana", nameEn: "Government Complex", nameTh: "ศูนย์ราชการเฉลิมพระเกียรติ" },
+      { id: "nat_telecom", nameEn: "National Telecom", nameTh: "โทรคมนาคมแห่งชาติ" },
+      { id: "lak_si", nameEn: "Lak Si", nameTh: "หลักสี่" },
+      { id: "rajabhat_phra_nakhon", nameEn: "Rajabhat Phra Nakhon", nameTh: "ราชภัฏพระนคร" },
+      { id: "wat_phra_sri_mahathat", nameEn: "Wat Phra Sri Mahathat", nameTh: "วัดพระศรีมหาธาตุ" },
+      { id: "ram_intra_3", nameEn: "Ram Intra 3", nameTh: "รามอินทรา 3" },
+      { id: "lat_pla_khao", nameEn: "Lat Pla Khao", nameTh: "ลาดปลาเค้า" },
+      { id: "ram_intra_km4", nameEn: "Ram Intra Km.4", nameTh: "รามอินทรา กม.4" },
+      { id: "mailap", nameEn: "Mailap", nameTh: "มัยลาภ" },
+      { id: "watcharaphon", nameEn: "Watcharaphon", nameTh: "วัชรพล" },
+      { id: "ram_intra_km6", nameEn: "Ram Intra Km.6", nameTh: "รามอินทรา กม.6" },
+      { id: "khu_bon", nameEn: "Khu Bon", nameTh: "คู้บอน" },
+      { id: "ram_intra_km9", nameEn: "Ram Intra Km.9", nameTh: "รามอินทรา กม.9" },
+      { id: "wongwaen_ram_intra", nameEn: "Wongwaen Ram Intra", nameTh: "วงแหวนรามอินทรา" },
+      { id: "noppharat", nameEn: "Noppharat", nameTh: "นพรัตน์" },
+      { id: "bang_chan", nameEn: "Bang Chan", nameTh: "บางชัน" },
+      { id: "setthabut_bamroeng", nameEn: "Setthabut Bamroeng", nameTh: "เศรษฐบุตรบำเพ็ญ" },
+      { id: "talat_minburi", nameEn: "Talat Minburi", nameTh: "ตลาดมีนบุรี" },
+      { id: "minburi", nameEn: "Min Buri", nameTh: "มีนบุรี" },
+    ],
+  },
+  {
+    id: "arl",
+    name: "Airport Rail Link",
+    nameEn: "Airport Rail Link",
+    stations: [
+      { id: "phaya_thai", nameEn: "Phaya Thai", nameTh: "พญาไท" },
+      { id: "ratchaprarop", nameEn: "Ratchaprarop", nameTh: "ราชปรารภ" },
+      { id: "phetchaburi", nameEn: "Makkasan", nameTh: "มักกะสัน" },
+      { id: "ramkhamhaeng", nameEn: "Ramkhamhaeng", nameTh: "รามคำแหง" },
+      { id: "hua_mak", nameEn: "Hua Mak", nameTh: "หัวหมาก" },
+      { id: "ban_thap_chang", nameEn: "Ban Thap Chang", nameTh: "บ้านทับช้าง" },
+      { id: "lat_krabang", nameEn: "Lat Krabang", nameTh: "ลาดกระบัง" },
+      { id: "suvarnabhumi", nameEn: "Suvarnabhumi", nameTh: "สุวรรณภูมิ" },
+    ],
+  },
+];
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { LINES };
+}
+if (typeof window !== "undefined") {
+  window.LINES = LINES;
+}
+
+// MRT Blue has two "Tha Phra" entries (upper/lower platform); use same id for interchange continuity.
+// lat_phrao on MRT Blue connects to BTS Ratchayothin - we need to add ratchayothin to MRT or treat as same.
+// Plan says: ห้าแยกลาดพร้าว (BL16) — BTS สุขุมวิท ↔ MRT สายน้ำเงิน. So MRT station "Lat Phrao" = BTS "Ratchayothin".
+// In lines we have BTS ratchayothin and MRT lat_phrao - they're different ids. So interchanges.js will list both as one interchange: { stationIds: ["ratchayothin", "lat_phrao"], lines: ["bts_sukhumvit", "mrt_blue"] }. That way route finder knows you can transfer between bts_sukhumvit@ratchayothin and mrt_blue@lat_phrao.
+
+// Actually simpler: use one canonical id per physical station. So MRT Blue should use "ratchayothin" for Lat Phrao station (since it connects to BTS Ratchayothin). Let me change MRT Blue's lat_phrao to ratchayothin so one id.
+/**
+<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
+ * Interchange stations: which station ids connect which lines.
+ * A station id that appears on multiple lines (in lines.js) is an interchange.
+ * This file can list them explicitly for documentation and for validation.
+ * Route finder derives interchanges from LINES (same id on multiple lines).
+ */
+const INTERCHANGES = [
+  { stationId: "siam", lines: ["bts_sukhumvit", "bts_silom"] },
+  { stationId: "krung_thon_buri", lines: ["bts_silom", "bts_gold"] },
+  { stationId: "mo_chit", lines: ["bts_sukhumvit", "mrt_blue"] },
+  { stationId: "phaya_thai", lines: ["bts_sukhumvit", "arl"] },
+  { stationId: "asok", lines: ["bts_sukhumvit", "mrt_blue"] },
+  { stationId: "sala_daeng", lines: ["bts_silom", "mrt_blue"] },
+  { stationId: "bang_wa", lines: ["bts_silom", "mrt_blue"] },
+  { stationId: "ratchayothin", lines: ["bts_sukhumvit", "mrt_blue"] },
+  { stationId: "tao_poon", lines: ["mrt_blue", "mrt_purple"] },
+  { stationId: "phetchaburi", lines: ["mrt_blue", "arl"] },
+  { stationId: "lat_phrao", lines: ["mrt_blue", "mrt_yellow"] },
+  { stationId: "hua_mak", lines: ["arl", "mrt_yellow"] },
+  { stationId: "samrong", lines: ["bts_sukhumvit", "mrt_yellow"] },
+  { stationId: "nonthaburi_civic_center", lines: ["mrt_purple", "mrt_pink"] },
+  { stationId: "wat_phra_sri_mahathat", lines: ["bts_sukhumvit", "mrt_pink"] },
+];
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { INTERCHANGES };
+}
+if (typeof window !== "undefined") {
+  window.INTERCHANGES = INTERCHANGES;
+}
+/**
+ * Route finder: given origin (lineId, stationId) and destination (lineId, stationId),
+ * returns array of legs { lineId, lineName, boardAt, alightAt }.
+ */
+
+(function (global) {
+  const LINES = global.LINES || [];
+
+  function getLine(lineId) {
+    return LINES.find((l) => l.id === lineId) || null;
+  }
+
+  function getStationIndex(lineId, stationId) {
+    const line = getLine(lineId);
+    if (!line) return -1;
+    const i = line.stations.findIndex((s) => s.id === stationId);
+    return i;
+  }
+
+  function getStationIndices(lineId, stationId) {
+    const line = getLine(lineId);
+    if (!line) return [];
+    const out = [];
+    line.stations.forEach((s, i) => { if (s.id === stationId) out.push(i); });
+    return out;
+  }
+
+  function getDirectionTowards(lineId, fromStationId, toStationId) {
+    const line = getLine(lineId);
+    if (!line) return "last";
+    const fromIdx = getStationIndices(lineId, fromStationId);
+    const toIdx = getStationIndices(lineId, toStationId);
+    for (const fi of fromIdx) {
+      for (const ti of toIdx) {
+        if (ti === fi + 1) return "last";
+        if (ti === fi - 1) return "first";
+      }
+    }
+    return "last";
+  }
+
+  function getDirectionTerminus(lineId, boardAt, alightAt, nextStationId) {
+    const line = getLine(lineId);
+    if (!line || line.stations.length === 0) return null;
+    const towards = nextStationId != null ? nextStationId : alightAt;
+    const dir = getDirectionTowards(lineId, boardAt, towards);
+    const station = dir === "first" ? line.stations[0] : line.stations[line.stations.length - 1];
+    return station ? (station.nameTh || station.nameEn) : null;
+  }
+
+  function getStationAt(lineId, index) {
+    const line = getLine(lineId);
+    if (!line || index < 0 || index >= line.stations.length) return null;
+    return line.stations[index];
+  }
+
+  /** Get neighbor nodes (lineId, stationId) from (lineId, stationId) */
+  function getNeighbors(lineId, stationId) {
+    const result = [];
+    const line = getLine(lineId);
+    if (!line) return result;
+
+    // Same line: all indices where this stationId appears (handles loops e.g. MRT Blue Tha Phra)
+    for (let idx = 0; idx < line.stations.length; idx++) {
+      if (line.stations[idx].id !== stationId) continue;
+      if (idx > 0) {
+        result.push({ lineId, stationId: line.stations[idx - 1].id });
+      }
+      if (idx < line.stations.length - 1) {
+        result.push({ lineId, stationId: line.stations[idx + 1].id });
+      }
+    }
+
+    // Interchange: same stationId on other lines
+    for (const l of LINES) {
+      if (l.id === lineId) continue;
+      const hasStation = l.stations.some((s) => s.id === stationId);
+      if (hasStation) result.push({ lineId: l.id, stationId });
+    }
+
+    return result;
+  }
+
+  /** BFS from (originLineId, originStationId) to (destLineId, destStationId). Returns path as array of { lineId, stationId }. */
+  function findPath(originLineId, originStationId, destLineId, destStationId) {
+    const start = { lineId: originLineId, stationId: originStationId };
+    const end = { lineId: destLineId, stationId: destStationId };
+    const key = (n) => `${n.lineId}:${n.stationId}`;
+    if (key(start) === key(end)) return [start];
+
+    const queue = [[start]];
+    const visited = new Set([key(start)]);
+
+    while (queue.length > 0) {
+      const path = queue.shift();
+      const node = path[path.length - 1];
+
+      for (const neighbor of getNeighbors(node.lineId, node.stationId)) {
+        const k = key(neighbor);
+        if (visited.has(k)) continue;
+        visited.add(k);
+        const newPath = path.concat([neighbor]);
+        if (k === key(end)) return newPath;
+        queue.push(newPath);
+      }
+    }
+    return [];
+  }
+
+  /** Collapse path into legs: consecutive same-line segments become one leg. */
+  function pathToLegs(path) {
+    if (path.length === 0) return [];
+    const legs = [];
+    let i = 0;
+    while (i < path.length) {
+      const lineId = path[i].lineId;
+      const line = getLine(lineId);
+      const lineName = line ? line.name : lineId;
+      let j = i;
+      while (j + 1 < path.length && path[j + 1].lineId === lineId) j++;
+      const boardAt = path[i].stationId;
+      const alightAt = path[j].stationId;
+      const nextInPath = i < j ? path[i + 1].stationId : null;
+      const directionTerminus = getDirectionTerminus(lineId, boardAt, alightAt, nextInPath);
+      legs.push({
+        lineId,
+        lineName,
+        boardAt,
+        alightAt,
+        directionTerminus: directionTerminus || undefined,
+      });
+      i = j + 1;
+    }
+    return legs;
+  }
+
+  /**
+   * Find route from origin to destination.
+   * @param {string} originLineId
+   * @param {string} originStationId
+   * @param {string} destLineId
+   * @param {string} destStationId
+   * @returns {{ legs: Array<{ lineId, lineName, boardAt, alightAt }>, error?: string }}
+   */
+  function findRoute(originLineId, originStationId, destLineId, destStationId) {
+    if (
+      getStationIndex(originLineId, originStationId) < 0 ||
+      getStationIndex(destLineId, destStationId) < 0
+    ) {
+      return { legs: [], error: "ไม่พบสถานีที่เลือก" };
+    }
+
+    const path = findPath(originLineId, originStationId, destLineId, destStationId);
+    if (path.length === 0) {
+      return { legs: [], error: "หาเส้นทางไม่ได้" };
+    }
+
+    const legs = pathToLegs(path);
+    return { legs };
+  }
+
+  function getStationName(lineId, stationId) {
+    const line = getLine(lineId);
+    if (!line) return stationId;
+    const st = line.stations.find((s) => s.id === stationId);
+    return st ? st.nameTh || st.nameEn : stationId;
+  }
+
+  global.RouteFinder = {
+    findRoute,
+    getLine,
+    getStationIndex,
+    getStationName,
+    getStationAt,
+    LINES,
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+/**
+ * UI: line/station dropdowns and route result display.
+ */
+(function () {
+  const originLineEl = document.getElementById("origin-line");
+  const originStationEl = document.getElementById("origin-station");
+  const destLineEl = document.getElementById("dest-line");
+  const destStationEl = document.getElementById("dest-station");
+  const btnSearch = document.getElementById("btn-search");
+  const resultSection = document.getElementById("result-section");
+  const resultContent = document.getElementById("result-content");
+
+  function getLines() {
+    return window.LINES || [];
+  }
+
+  function clearSelect(selectEl) {
+    selectEl.innerHTML = "";
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "-- เลือก --";
+    selectEl.appendChild(empty);
+  }
+
+  function fillLineSelect(selectEl) {
+    clearSelect(selectEl);
+    const lines = getLines();
+    for (const line of lines) {
+      const opt = document.createElement("option");
+      opt.value = line.id;
+      opt.textContent = line.name || line.id;
+      selectEl.appendChild(opt);
+    }
+  }
+
+  function fillStationSelect(selectEl, lineId) {
+    clearSelect(selectEl);
+    if (!lineId || typeof lineId !== "string") return;
+    const rawId = String(lineId).trim();
+    const lines = getLines();
+    const line = lines.find(function (l) { return l.id === rawId; });
+    if (!line || !Array.isArray(line.stations)) return;
+    for (const station of line.stations) {
+      const opt = document.createElement("option");
+      opt.value = station.id;
+      opt.textContent = (station.nameTh || station.nameEn || station.id) + " / " + (station.nameEn || station.nameTh || station.id);
+      selectEl.appendChild(opt);
+    }
+  }
+
+  function onOriginLineChange() {
+    const lineId = originLineEl.value;
+    fillStationSelect(originStationEl, lineId);
+  }
+
+  function onDestLineChange() {
+    const lineId = destLineEl.value;
+    fillStationSelect(destStationEl, lineId);
+  }
+
+  function getStationName(lineId, stationId) {
+    return window.RouteFinder && window.RouteFinder.getStationName(lineId, stationId);
+  }
+
+  function renderResult(legs, error) {
+    resultContent.classList.remove("empty");
+    if (error) {
+      resultContent.innerHTML = '<p class="error">' + escapeHtml(error) + "<\/p>";
+      return;
+    }
+    if (!legs || legs.length === 0) {
+      resultContent.innerHTML = "<p class=\"empty\">เลือกต้นทางและปลายทาง แล้วกดค้นหาเส้นทาง<\/p>";
+      resultContent.classList.add("empty");
+      return;
+    }
+
+    const ul = document.createElement("ul");
+    ul.className = "legs";
+    for (let i = 0; i < legs.length; i++) {
+      const leg = legs[i];
+      const boardName = getStationName(leg.lineId, leg.boardAt);
+      const alightName = getStationName(leg.lineId, leg.alightAt);
+      const li = document.createElement("li");
+      li.className = "leg";
+      var directionNote = leg.directionTerminus ? " (ไปฝั่ง" + escapeHtml(leg.directionTerminus) + ")" : "";
+      li.innerHTML =
+        '<span class="line-name">' + escapeHtml(leg.lineName) + directionNote + "<\/span><br \/>" +
+        "ขึ้นที่ " + escapeHtml(boardName) + " → ลงที่ " + escapeHtml(alightName);
+      if (i < legs.length - 1) {
+        li.innerHTML += '<div class="transfer-note">เปลี่ยนที่ ' + escapeHtml(alightName) + "<\/div>";
+      }
+      ul.appendChild(li);
+    }
+    const summary = document.createElement("p");
+    summary.className = "summary";
+    if (legs.length === 1) {
+      summary.textContent = "เส้นทางตรงสาย ไม่ต้องเปลี่ยน";
+    } else {
+      summary.textContent = "เปลี่ยนสาย " + (legs.length - 1) + " ครั้ง";
+    }
+    resultContent.innerHTML = "";
+    resultContent.appendChild(ul);
+    resultContent.appendChild(summary);
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function search() {
+    const originLineId = originLineEl.value;
+    const originStationId = originStationEl.value;
+    const destLineId = destLineEl.value;
+    const destStationId = destStationEl.value;
+
+    if (!originLineId || !originStationId || !destLineId || !destStationId) {
+      renderResult(null, "กรุณาเลือกสายและสถานีต้นทางและปลายทาง");
+      return;
+    }
+
+    if (originLineId === destLineId && originStationId === destStationId) {
+      renderResult(null, "ต้นทางและปลายทางเป็นสถานีเดียวกัน");
+      return;
+    }
+
+    const result = window.RouteFinder.findRoute(
+      originLineId,
+      originStationId,
+      destLineId,
+      destStationId
+    );
+    renderResult(result.legs, result.error);
+  }
+
+  function init() {
+    var lines = getLines();
+    if (!lines || lines.length === 0) {
+      setTimeout(init, 30);
+      return;
+    }
+    fillLineSelect(originLineEl);
+    fillLineSelect(destLineEl);
+    originStationEl.disabled = true;
+    destStationEl.disabled = true;
+
+    originLineEl.addEventListener("change", function () {
+      onOriginLineChange();
+      originStationEl.disabled = !originLineEl.value;
+    });
+
+    destLineEl.addEventListener("change", function () {
+      onDestLineChange();
+      destStationEl.disabled = !destLineEl.value;
+    });
+
+    btnSearch.addEventListener("click", search);
+
+    resultContent.innerHTML = "<p class=\"empty\">เลือกต้นทางและปลายทาง แล้วกดค้นหาเส้นทาง<\/p>";
+    resultContent.classList.add("empty");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+  </script>
+</body>
+</html>
