@@ -80,7 +80,7 @@ var LINES = [
   },
   {
     id: "bts_gold",
-    name: "BTS สายทอง",
+    name: "BTS สายสีทอง",
     nameEn: "BTS Gold Line",
     stations: [
       { id: "krung_thon_buri", nameEn: "Krung Thon Buri", nameTh: "กรุงธนบุรี" },
